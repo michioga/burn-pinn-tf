@@ -1,0 +1,53 @@
+use crate::{AutodiffBackend, model::TuningForkPINN, physics::tuning_fork_loss};
+use burn::{
+    optim::{AdamConfig, GradientsParams, Optimizer},
+    prelude::*,
+    record::{CompactRecorder, Recorder},
+    tensor::Distribution,
+};
+
+pub fn run() {
+    let device = Default::default();
+
+    let num_epochs = 10000;
+    let batch_size = 128;
+    let learning_rate = 1e-4;
+
+    let mut model: TuningForkPINN<AutodiffBackend> = TuningForkPINN::new(&device);
+    let mut optimizer = AdamConfig::new().init();
+
+    let artifact_dir = "./artifacts";
+    std::fs::create_dir_all(artifact_dir).ok();
+
+    println!("Starting training on {:?}...", device);
+
+    for epoch in 1..=num_epochs {
+        let target_freqs = Tensor::<AutodiffBackend, 2>::random(
+            [batch_size, 1],
+            Distribution::Uniform(200.0, 2000.0),
+            &device,
+        );
+
+        let predicted_dims = model.forward(target_freqs.clone());
+        let loss = tuning_fork_loss(predicted_dims, target_freqs);
+
+        if epoch % 100 == 0 {
+            let loss_val = loss.clone().into_data().into_vec::<f32>().unwrap()[0];
+            println!("Epoch: {:>5}, Loss: {:.6}", epoch, loss_val);
+        }
+
+        let grads = loss.backward();
+
+        // --- これが最終的な修正です ---
+        // `from`がジェネリック関数のため、ターボフィッシュ構文で型を明示的に指定する
+        let grads = GradientsParams::from::<AutodiffBackend>(grads);
+
+        model = optimizer.step(learning_rate, model, grads);
+    }
+
+    CompactRecorder::new()
+        .record(model.into_record(), format!("{artifact_dir}/model").into())
+        .expect("Failed to save model");
+
+    println!("\nModel saved to '{artifact_dir}/model.mpk'");
+}

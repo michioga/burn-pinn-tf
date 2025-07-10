@@ -1,0 +1,12 @@
+[package]
+name = "burn-tuningfork-pinn"
+version = "0.1.0"
+edition = "2024"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+# Burn v0.17.1 with wgpu backend, training and standard library features
+burn = { version = "0.17.1", features = ["ndarray", "train", "dataset"] }
+# Command line argument parser
+clap = { version = "4.5.8", features = ["derive"] }
