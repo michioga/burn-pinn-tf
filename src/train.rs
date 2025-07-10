@@ -1,14 +1,11 @@
 //! # 学習ロジック
 //!
-//! `burn`の`Learner` APIを使用してモデルの学習プロセスを管理します。
+//! `burn`の`Learner` APIを使用して、物理情報ニューラルネットワーク（PINN）の学習プロセスを管理します。
+//! このモジュールは、任意のバックエンドで動作するようにジェネリックになっています。
 
 use crate::model::TuningForkPINN;
 use crate::physics::tuning_fork_loss;
 use burn::{
-    backend::{
-        Autodiff,
-        ndarray::{NdArray, NdArrayDevice},
-    },
     config::Config,
     data::{dataloader::DataLoaderBuilder, dataloader::batcher::Batcher, dataset::Dataset},
     lr_scheduler::constant::ConstantLr,
@@ -16,12 +13,13 @@ use burn::{
     optim::AdamConfig,
     prelude::*,
     record::{CompactRecorder, Recorder},
-    tensor::Distribution,
     tensor::backend::AutodiffBackend,
     train::{LearnerBuilder, RegressionOutput, TrainOutput, TrainStep, ValidStep},
 };
+use rand::{thread_rng, Rng};
 
 /// 学習データをオンザフライで生成するデータセット。
+///
 /// 物理シミュレーションであるため、事前にデータファイルを用意する必要がなく、
 /// 必要になるたびにランダムな周波数を生成します。
 #[derive(Clone, Debug)]
@@ -34,30 +32,29 @@ pub struct TuningForkDataset {
 
 impl Dataset<f32> for TuningForkDataset {
     /// データセットから一つのアイテム（周波数）を取得します。
+    ///
     /// この実装では、呼ばれるたびに新しいランダムな周波数を返します。
     fn get(&self, _index: usize) -> Option<f32> {
-        let frequency = Tensor::<NdArray<f32>, 1>::random(
-            [1],
-            // 修正: Distribution::Uniformはf64を要求するため、f32から変換する
-            Distribution::Uniform(self.freq_range.0.into(), self.freq_range.1.into()),
-            &Default::default(),
-        )
-        .into_data()
-        .into_vec::<f32>()
-        .unwrap()[0];
+        let mut rng = thread_rng();
+        let frequency = rng.gen_range(self.freq_range.0..=self.freq_range.1);
         Some(frequency)
     }
+
+    /// データセットの長さを返します。
     fn len(&self) -> usize {
         self.size
     }
 }
 
 /// データセットから取得したアイテムをミニバッチにまとめるバッチャ。
+///
+/// `f32`のスライスを、指定されたバックエンドのテンソルに変換します。
 pub struct TuningForkBatcher<B: Backend> {
     _device: B::Device,
 }
 
 impl<B: Backend> TuningForkBatcher<B> {
+    /// 新しいバッチャを作成します。
     pub fn new(device: B::Device) -> Self {
         Self { _device: device }
     }
@@ -76,6 +73,11 @@ impl<B: Backend> Batcher<B, f32, Tensor<B, 2>> for TuningForkBatcher<B> {
 
 /// モデルの学習ステップを定義します。
 impl<B: AutodiffBackend> TrainStep<Tensor<B, 2>, RegressionOutput<B>> for TuningForkPINN<B> {
+    /// 1回の学習ステップを実行します。
+    ///
+    /// 1. モデルによる予測
+    /// 2. 物理法則に基づいた損失の計算
+    /// 3. 勾配の計算と逆伝播
     fn step(&self, item: Tensor<B, 2>) -> TrainOutput<RegressionOutput<B>> {
         let predicted_dims = self.forward(item.clone());
         let loss = tuning_fork_loss(predicted_dims.clone(), item.clone());
@@ -90,6 +92,9 @@ impl<B: AutodiffBackend> TrainStep<Tensor<B, 2>, RegressionOutput<B>> for Tuning
 
 /// モデルの検証ステップを定義します。
 impl<B: Backend> ValidStep<Tensor<B, 2>, RegressionOutput<B>> for TuningForkPINN<B> {
+    /// 1回の検証ステップを実行します。
+    ///
+    /// 損失を計算し、学習の進捗をモニタリングします。
     fn step(&self, item: Tensor<B, 2>) -> RegressionOutput<B> {
         let predicted_dims = self.forward(item.clone());
         let loss = tuning_fork_loss(predicted_dims.clone(), item.clone());
@@ -104,27 +109,37 @@ impl<B: Backend> ValidStep<Tensor<B, 2>, RegressionOutput<B>> for TuningForkPINN
 /// 学習プロセス全体の設定を保持します。
 #[derive(Config)]
 pub struct TrainingConfig {
+    /// オプティマイザの設定。
     pub optimizer: AdamConfig,
+    /// 学習率。
     #[config(default = 1e-4)]
     pub learning_rate: f64,
+    /// 学習エポック数。
     #[config(default = 10000)]
     pub num_epochs: usize,
+    /// バッチサイズ。
     #[config(default = 128)]
     pub batch_size: usize,
 }
 
 /// 学習プロセスを実行します。
-pub fn run() {
-    // バックエンドの型をndarrayに固定
-    type AppBackend = NdArray<f32>;
-    type AppAutodiffBackend = Autodiff<AppBackend>;
-
-    let device: NdArrayDevice = Default::default();
+///
+/// # Type Parameters
+///
+/// * `B` - 学習に使用するバックエンド（例: `Autodiff<Wgpu>`、`Autodiff<NdArray>`）。
+///
+/// # Arguments
+///
+/// * `device` - 学習に使用するデバイス。
+pub fn run<B: AutodiffBackend>(device: B::Device)
+where
+    B::InnerBackend: Backend,
+{
     let config = TrainingConfig::new(AdamConfig::new());
     let artifact_dir = "./artifacts";
 
     // 学習用データローダー
-    let batcher_train = TuningForkBatcher::<AppAutodiffBackend>::new(device.clone());
+    let batcher_train = TuningForkBatcher::<B>::new(device.clone());
     let dataloader_train = DataLoaderBuilder::new(batcher_train)
         .batch_size(config.batch_size)
         .num_workers(4)
@@ -134,7 +149,7 @@ pub fn run() {
         });
 
     // 検証用データローダー
-    let batcher_valid = TuningForkBatcher::<AppBackend>::new(device.clone());
+    let batcher_valid = TuningForkBatcher::<B::InnerBackend>::new(device.clone());
     let dataloader_valid = DataLoaderBuilder::new(batcher_valid)
         .batch_size(config.batch_size)
         .num_workers(4)
@@ -150,7 +165,7 @@ pub fn run() {
         .devices(vec![device.clone()])
         .num_epochs(config.num_epochs)
         .build(
-            TuningForkPINN::<AppAutodiffBackend>::new(&device),
+            TuningForkPINN::<B>::new(&device),
             config.optimizer.init(),
             scheduler,
         );

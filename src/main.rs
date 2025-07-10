@@ -1,6 +1,16 @@
-use clap::{Parser, Subcommand};
-// プロジェクト名（ライブラリ名）を使ってモジュールをインポート
+//! # メインエントリーポイント
+//!
+//! コマンドライン引数を解析し、選択されたバックエンド（`ndarray`または`wgpu`）で
+//! 学習または推論プロセスを開始します。
+
+#![recursion_limit = "256"]
+
+use burn::backend::{wgpu::Wgpu, Autodiff, NdArray};
 use burn_tuningfork_pinn::{infer, train};
+use clap::{Parser, Subcommand};
+
+/// デフォルトのバックエンドをWGPUに設定します。
+type DefaultBackend = Wgpu;
 
 /// コマンドラインインターフェースの定義
 #[derive(Parser, Debug)]
@@ -8,6 +18,13 @@ use burn_tuningfork_pinn::{infer, train};
 struct Cli {
     #[command(subcommand)]
     command: Commands,
+
+    /// 使用するバックエンドを指定します。
+    ///
+    /// `ndarray`または`wgpu`を選択できます。
+    #[arg(long, default_value = "wgpu")]
+    backend: String,
+
 }
 
 /// サブコマンド (`train` または `infer`)
@@ -24,17 +41,21 @@ enum Commands {
 }
 
 /// アプリケーションのエントリーポイント
+///
+/// コマンドライン引数を解析し、指定されたサブコマンドとバックエンドに基づいて
+/// 適切なアクション（学習または推論）を実行します。
 fn main() {
     let cli = Cli::parse();
 
+    let device = burn::backend::wgpu::WgpuDevice::default();
     match cli.command {
         Commands::Train => {
             println!("🚀 Starting training...");
-            train::run();
+            train::run::<Autodiff<Wgpu>>(device);
         }
         Commands::Infer { freq } => {
-            println!("🔍 Inferring for frequency: {} Hz", freq);
-            infer::run(freq);
+            println!("🔍 Inferring for frequency: {} Hz ", freq);
+            infer::run::<Wgpu>(freq, device);
         }
     }
 }

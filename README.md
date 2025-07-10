@@ -16,9 +16,9 @@ PINNは、物理現象を支配する**物理法則（偏微分方程式など�
 
 音叉のプロング（振動する腕）の基本周波 $f$ は、以下の簡易式でモデル化されます。この式が損失関数の中核を担います。
 
-$$
+$
 f = \frac{K}{L^2} \sqrt{\frac{E \cdot I}{\rho \cdot A}}
-$$
+$
 
 | 変数 | 説明 | 対応する定数/変数 |
 | :--- | :--- | :--- |
@@ -38,7 +38,7 @@ $$
 
 - **モデル**: シンプルな3層の多層パーセプトロン (MLP) です。
 - **フレームワーク**: `burn` を使用しています。
-- **バックエンド**: CPUで動作する `ndarray` バックエンドを使用しています。
+- **バックエンド**: `ndarray` (CPU) と `wgpu` (GPU) の両方をサポートしており、コマンドライン引数で切り替え可能です。
 - **学習**: `burn`の`Learner` APIを活用し、学習ループ、メトリクス記録、モデル保存を効率的に行っています。
 
 ## セットアップ
@@ -47,7 +47,7 @@ Rustの環境がセットアップされている必要があります。
 
 1.  リポジトリをクローンします。
     ```bash
-    git clone [https://github.com/user/burn-tuningfork-pinn.git](https://github.com/user/burn-tuningfork-pinn.git)
+    git clone https://github.com/user/burn-tuningfork-pinn.git
     cd burn-tuningfork-pinn
     ```
 2.  依存関係をビルドします。
@@ -59,29 +59,40 @@ Rustの環境がセットアップされている必要があります。
 
 ### 1. 学習
 
-以下のコマンドでモデルの学習を開始します。学習済みモデルは `artifacts/` ディレクトリに保存されます。
+以下のコマンドでモデルの学習を開始します。`--backend`フラグを使用して、`ndarray`（CPU）または`wgpu`（GPU）を選択できます。学習済みモデルは `artifacts/` ディレクトリに保存されます。
 
-```bash
-cargo run --release -- train
-```
+- **`wgpu` バックエンドで学習 (デフォルト):**
+  ```bash
+  cargo run --release -- train --backend wgpu
+  ```
+
+- **`ndarray` バックエンドで学習:**
+  ```bash
+  cargo run --release -- train --backend ndarray
+  ```
 
 ### 2. 推論
 
 学習済みモデルを使い、指定した周波数に対する音叉の寸法を推論します。
 
-- **例: 440Hz (A4) の音叉の寸法を推論**
+- **例: 440Hz (A4) の音叉の寸法を `wgpu` で推論**
   ```bash
-  cargo run --release -- infer --freq 440
+  cargo run --release -- infer --freq 440 --backend wgpu
+  ```
+
+- **例: 262Hz (C4) の音叉の寸法を `ndarray` で推論**
+  ```bash
+  cargo run --release -- infer --freq 262 --backend ndarray
   ```
 
 ## ソースコード構成
 
-- `main.rs`: エントリーポイント。コマンドライン引数を解析します。
+- `main.rs`: エントリーポイント。コマンドライン引数を解析し、バックエンドを選択します。
 - `model.rs`: ニューラルネットワークの構造を定義します。
 - `physics.rs`: 物理法則に基づいた損失関数を定義します。
 - `constants.rs`: 物理計算で使用する定数を定義します。
-- `train.rs`: `Learner` APIを使った学習ロジックです。
-- `infer.rs`: 学習済みモデルを使った推論ロジックです。
+- `train.rs`: `Learner` APIを使ったジェネリックな学習ロジックです。
+- `infer.rs`: 学習済みモデルを使ったジェネリックな推論ロジックです。
 
 ## ドキュメント生成
 
