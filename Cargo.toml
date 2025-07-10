@@ -10,3 +10,13 @@ edition = "2024"
 burn = { version = "0.17.1", features = ["ndarray", "train", "dataset"] }
 # Command line argument parser
 clap = { version = "4.5.8", features = ["derive"] }
+
+# 統合テストの定義を追加
+[[test]]
+name = "integration_test"          # テスト名
+path = "tests/integration_test.rs" # テストファイルのパス
+
+#
+[[test]]
+name = "physics_test"
+path = "tests/physics_test.rs"
