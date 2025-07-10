@@ -1,8 +1,8 @@
-//! # 物理定数モジュール
+//! # 定数モジュール
 //!
-//! このモジュールは、物理計算で使用される定数を定義します。
-//! 主にステンレス鋼 (SUS304) の物性を想定しています。
+//! このモジュールは、物理計算やモデル定義で使用される定数を定義します。
 
+/// 物理計算に関する定数
 pub mod physics {
     // 材質: ステンレス鋼 (SUS304) を想定
     /// ヤング率 (Pa)。材料の硬さを示す指標。
@@ -22,4 +22,20 @@ pub mod physics {
     pub const PENALTY_WEIGHT_RATIO: f32 = 0.5;
     /// `range_penalty`（プロング直径の範囲）に対する重み。
     pub const PENALTY_WEIGHT_RANGE: f32 = 1.0;
+}
+
+/// モデルの寸法に関する定数
+pub mod model_dims {
+    /// 出力次元の総数
+    pub const NUM_DIMS: usize = 5;
+    /// 柄の長さのインデックス
+    pub const HANDLE_LENGTH_IDX: usize = 0;
+    /// 柄の直径のインデックス
+    pub const HANDLE_DIAMETER_IDX: usize = 1;
+    /// プロングの長さのインデックス
+    pub const PRONG_LENGTH_IDX: usize = 2;
+    /// プロングの直径のインデックス
+    pub const PRONG_DIAMETER_IDX: usize = 3;
+    /// プロングの間隔のインデックス
+    pub const PRONG_GAP_IDX: usize = 4;
 }

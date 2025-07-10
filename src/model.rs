@@ -2,6 +2,7 @@
 //!
 //! 周波数から音叉の寸法を予測するための、シンプルな多層パーセプトロン (MLP) モデルを定義します。
 
+use crate::constants::model_dims;
 use burn::prelude::*;
 use burn::{
     nn::{Linear, LinearConfig, Relu},
@@ -41,7 +42,7 @@ impl<B: Backend> TuningForkPINN<B> {
             activation_2: Relu::new(),
             layer_3: LinearConfig::new(hidden_size, hidden_size).init(device),
             activation_3: Relu::new(),
-            output_layer: LinearConfig::new(hidden_size, 5).init(device),
+            output_layer: LinearConfig::new(hidden_size, model_dims::NUM_DIMS).init(device),
         }
     }
 

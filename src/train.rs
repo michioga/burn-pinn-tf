@@ -28,6 +28,8 @@ use burn::{
 pub struct TuningForkDataset {
     /// データセットの見かけ上のサイズ。
     pub size: usize,
+    /// 生成する周波数の範囲 (min, max)。
+    pub freq_range: (f32, f32),
 }
 
 impl Dataset<f32> for TuningForkDataset {
@@ -36,7 +38,8 @@ impl Dataset<f32> for TuningForkDataset {
     fn get(&self, _index: usize) -> Option<f32> {
         let frequency = Tensor::<NdArray<f32>, 1>::random(
             [1],
-            Distribution::Uniform(200.0, 2000.0),
+            // 修正: Distribution::Uniformはf64を要求するため、f32から変換する
+            Distribution::Uniform(self.freq_range.0.into(), self.freq_range.1.into()),
             &Default::default(),
         )
         .into_data()
@@ -127,6 +130,7 @@ pub fn run() {
         .num_workers(4)
         .build(TuningForkDataset {
             size: config.batch_size * 100,
+            freq_range: (200.0, 1800.0), // 学習用の周波数範囲
         });
 
     // 検証用データローダー
@@ -136,6 +140,7 @@ pub fn run() {
         .num_workers(4)
         .build(TuningForkDataset {
             size: config.batch_size * 20,
+            freq_range: (1800.0, 2000.0), // 検証用の周波数範囲
         });
 
     let scheduler = ConstantLr::new(config.learning_rate);
