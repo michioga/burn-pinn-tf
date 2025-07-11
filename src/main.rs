@@ -1,16 +1,15 @@
 //! # メインエントリーポイント
 //!
-//! コマンドライン引数を解析し、選択されたバックエンド（`ndarray`または`wgpu`）で
+//! コマンドライン引数を解析し、選択されたバックエンド（`wgpu`、`ndarray`、`cuda`）で
 //! 学習または推論プロセスを開始します。
 
 #![recursion_limit = "256"]
 
-use burn::backend::{wgpu::Wgpu, Autodiff, NdArray};
+use burn::backend::{Autodiff, NdArray, wgpu::Wgpu, Cuda};
 use burn_tuningfork_pinn::{infer, train};
 use clap::{Parser, Subcommand};
 
-/// デフォルトのバックエンドをWGPUに設定します。
-type DefaultBackend = Wgpu;
+// デフォルトのバックエンド定義は不要になります
 
 /// コマンドラインインターフェースの定義
 #[derive(Parser, Debug)]
@@ -21,10 +20,9 @@ struct Cli {
 
     /// 使用するバックエンドを指定します。
     ///
-    /// `ndarray`または`wgpu`を選択できます。
+    /// `ndarray`, `wgpu`, `cuda`を選択できます。
     #[arg(long, default_value = "wgpu")]
     backend: String,
-
 }
 
 /// サブコマンド (`train` または `infer`)
@@ -40,6 +38,25 @@ enum Commands {
     },
 }
 
+/// 指定されたバックエンドでアクション（学習または推論）を実行するためのマクロ
+macro_rules! run_action {
+    ($backend:ty, $device:expr, $command:expr) => {
+        match $command {
+            Commands::Train => {
+                println!("🚀 Starting training on {:?}...", $device);
+                train::run::<Autodiff<$backend>>($device);
+            }
+            Commands::Infer { freq } => {
+                println!(
+                    "🔍 Inferring for frequency: {} Hz on {:?}...",
+                    freq, $device
+                );
+                infer::run::<$backend>(freq, $device);
+            }
+        }
+    };
+}
+
 /// アプリケーションのエントリーポイント
 ///
 /// コマンドライン引数を解析し、指定されたサブコマンドとバックエンドに基づいて
@@ -47,15 +64,21 @@ enum Commands {
 fn main() {
     let cli = Cli::parse();
 
-    let device = burn::backend::wgpu::WgpuDevice::default();
-    match cli.command {
-        Commands::Train => {
-            println!("🚀 Starting training...");
-            train::run::<Autodiff<Wgpu>>(device);
+    match cli.backend.as_str() {
+        "wgpu" => {
+            let device = burn::backend::wgpu::WgpuDevice::default();
+            run_action!(Wgpu, device, cli.command);
         }
-        Commands::Infer { freq } => {
-            println!("🔍 Inferring for frequency: {} Hz ", freq);
-            infer::run::<Wgpu>(freq, device);
+        "ndarray" => {
+            let device = burn::backend::ndarray::NdArrayDevice::default();
+            run_action!(NdArray, device, cli.command);
+        }
+        "cuda" => {
+            let device = burn::backend::cuda::CudaDevice::default();
+            run_action!(Cuda, device, cli.command);
+        }
+        _ => {
+            panic!("❌ Invalid backend specified. Use 'wgpu', 'ndarray', or 'cuda'.");
         }
     }
 }
