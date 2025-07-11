@@ -1,11 +1,11 @@
 //! # メインエントリーポイント
 //!
-//! コマンドライン引数を解析し、選択されたバックエンド（`ndarray`または`wgpu`）で
+//! コマンドライン引数を解析し、選択されたバックエンド（`wgpu`、`ndarray`、`cuda`）で
 //! 学習または推論プロセスを開始します。
 
 #![recursion_limit = "256"]
 
-use burn::backend::{Autodiff, NdArray, wgpu::Wgpu};
+use burn::backend::{Autodiff, NdArray, wgpu::Wgpu, Cuda};
 use burn_tuningfork_pinn::{infer, train};
 use clap::{Parser, Subcommand};
 
@@ -20,7 +20,7 @@ struct Cli {
 
     /// 使用するバックエンドを指定します。
     ///
-    /// `ndarray`または`wgpu`を選択できます。
+    /// `ndarray`, `wgpu`, `cuda`を選択できます。
     #[arg(long, default_value = "wgpu")]
     backend: String,
 }
@@ -73,8 +73,12 @@ fn main() {
             let device = burn::backend::ndarray::NdArrayDevice::default();
             run_action!(NdArray, device, cli.command);
         }
+        "cuda" => {
+            let device = burn::backend::cuda::CudaDevice::default();
+            run_action!(Cuda, device, cli.command);
+        }
         _ => {
-            panic!("❌ Invalid backend specified. Use 'wgpu' or 'ndarray'.");
+            panic!("❌ Invalid backend specified. Use 'wgpu', 'ndarray', or 'cuda'.");
         }
     }
 }
