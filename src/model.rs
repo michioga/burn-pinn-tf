@@ -63,7 +63,6 @@ impl<B: Backend> TuningForkPINN<B> {
         let x = self.output_layer.forward(x);
 
         // softplusを適用して出力が必ず正の値になるようにする
-        // 非常に小さい値(1e-6)を加算して、ゼロ除算などを防ぐ
-        softplus(x, 1.0) + 1e-6
+        softplus(x, 1.0)
     }
 }

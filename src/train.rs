@@ -16,7 +16,7 @@ use burn::{
     tensor::backend::AutodiffBackend,
     train::{LearnerBuilder, RegressionOutput, TrainOutput, TrainStep, ValidStep},
 };
-use rand::{thread_rng, Rng};
+use rand::{Rng, thread_rng};
 
 /// 学習データをオンザフライで生成するデータセット。
 ///
@@ -118,7 +118,7 @@ pub struct TrainingConfig {
     #[config(default = 10000)]
     pub num_epochs: usize,
     /// バッチサイズ。
-    #[config(default = 128)]
+    #[config(default = 1024)]
     pub batch_size: usize,
 }
 
@@ -181,3 +181,4 @@ where
 
     println!("\n✅ Model saved to '{artifact_dir}/model.mpk'");
 }
+

@@ -21,7 +21,7 @@ struct Cli {
     /// 使用するバックエンドを指定します。
     ///
     /// `ndarray`, `wgpu`, `cuda`を選択できます。
-    #[arg(long, default_value = "wgpu")]
+    #[arg(long, default_value = "cuda")]
     backend: String,
 }
 
