@@ -7,7 +7,7 @@ edition = "2024"
 
 [dependencies]
 # Burn v0.17.1 with wgpu backend, training and standard library features
-burn = { version = "0.17.1", features = ["ndarray", "wgpu", "train", "dataset", "autodiff", "cuda"] }
+burn = { version = "0.18.0", features = ["ndarray", "wgpu", "train", "dataset", "autodiff", "cuda"] }
 # Command line argument parser
 clap = { version = "4.5.8", features = ["derive"] }
 # Random number generation
