@@ -61,13 +61,15 @@ impl<B: Backend> TuningForkBatcher<B> {
 }
 
 impl<B: Backend> Batcher<B, f32, Tensor<B, 2>> for TuningForkBatcher<B> {
-    /// `f32`のVecを`[batch_size, 1]`形状のテンソルに変換します。
+    /// `f32`のVecを`[batch_size, 1]`形状のテンソルに一括で変換します。
+    ///
+    /// この実装は、すべてのデータを一度にGPUに転送するため、
+    /// `iter().map().collect()`よりも効率的です。
     fn batch(&self, items: Vec<f32>, device: &B::Device) -> Tensor<B, 2> {
-        let tensors: Vec<_> = items
-            .iter()
-            .map(|item| Tensor::<B, 1>::from_floats([*item], device))
-            .collect();
-        Tensor::cat(tensors, 0).reshape([-1, 1])
+        // データをフラットなスライスとして取得
+        let data_slice = items.as_slice();
+        // スライスから直接テンソルを作成
+        Tensor::<B, 1>::from_floats(data_slice, device).reshape([-1, 1])
     }
 }
 
@@ -118,7 +120,7 @@ pub struct TrainingConfig {
     #[config(default = 10000)]
     pub num_epochs: usize,
     /// バッチサイズ。
-    #[config(default = 1024)]
+    #[config(default = 16384)]
     pub batch_size: usize,
 }
 
@@ -142,7 +144,7 @@ where
     let batcher_train = TuningForkBatcher::<B>::new(device.clone());
     let dataloader_train = DataLoaderBuilder::new(batcher_train)
         .batch_size(config.batch_size)
-        .num_workers(4)
+        .num_workers(64)
         .build(TuningForkDataset {
             size: config.batch_size * 100,
             freq_range: (200.0, 1800.0), // 学習用の周波数範囲
@@ -152,7 +154,7 @@ where
     let batcher_valid = TuningForkBatcher::<B::InnerBackend>::new(device.clone());
     let dataloader_valid = DataLoaderBuilder::new(batcher_valid)
         .batch_size(config.batch_size)
-        .num_workers(4)
+        .num_workers(64)
         .build(TuningForkDataset {
             size: config.batch_size * 20,
             freq_range: (1800.0, 2000.0), // 検証用の周波数範囲
@@ -181,4 +183,3 @@ where
 
     println!("\n✅ Model saved to '{artifact_dir}/model.mpk'");
 }
-
