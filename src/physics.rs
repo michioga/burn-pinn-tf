@@ -4,7 +4,7 @@
 
 use crate::constants::{model_dims, physics::*};
 use burn::prelude::*;
-use burn::tensor::{activation::relu, Tensor};
+use burn::tensor::{Tensor, activation::relu};
 
 /// 音叉の物理法則と制約に基づいた損失を計算します。
 ///
@@ -17,10 +17,6 @@ use burn::tensor::{activation::relu, Tensor};
 /// 目標周波数との誤差（損失）を算出します。
 /// さらに、物理的に不適切な寸法に対するペナルティを追加します。
 ///
-/// # Note
-///
-/// 計算効率を向上させるため、中間テンソルの生成と`.clone()`の呼び出しを
-/// 最小限に抑えるように最適化されています。
 pub fn tuning_fork_loss<B: Backend>(
     predicted_dims: Tensor<B, 2>,
     target_freqs: Tensor<B, 2>,
@@ -62,9 +58,8 @@ pub fn tuning_fork_loss<B: Backend>(
     let handle_length_penalty = relu(0.03 - handle_length.clone()).powf_scalar(2.0)
         + relu(handle_length.clone() - 0.15).powf_scalar(2.0);
 
-    let handle_diameter_penalty =
-        relu(0.005 - handle_diameter.clone()).powf_scalar(2.0)
-            + relu(handle_diameter.clone() - 0.02).powf_scalar(2.0);
+    let handle_diameter_penalty = relu(0.005 - handle_diameter.clone()).powf_scalar(2.0)
+        + relu(handle_diameter.clone() - 0.02).powf_scalar(2.0);
 
     let prong_gap_penalty = relu(0.002 - prong_gap.clone()).powf_scalar(2.0)
         + relu(prong_gap.clone() - 0.02).powf_scalar(2.0);

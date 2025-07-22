@@ -117,10 +117,10 @@ pub struct TrainingConfig {
     #[config(default = 1e-4)]
     pub learning_rate: f64,
     /// 学習エポック数。
-    #[config(default = 10000)]
+    #[config(default = 2000)]
     pub num_epochs: usize,
     /// バッチサイズ。
-    #[config(default = 16384)]
+    #[config(default = 1024)]
     pub batch_size: usize,
 }
 
@@ -163,9 +163,20 @@ where
     let scheduler = ConstantLr::new(config.learning_rate);
 
     // Learnerを構築
+    /*
     let learner = LearnerBuilder::new(artifact_dir)
         .devices(vec![device.clone()])
         .num_epochs(config.num_epochs)
+        .build(
+            TuningForkPINN::<B>::new(&device),
+            config.optimizer.init(),
+            scheduler,
+        );
+    */
+    let learner = LearnerBuilder::new(artifact_dir)
+        .devices(vec![device.clone()])
+        .num_epochs(config.num_epochs)
+        .grads_accumulation(1) // 必要に応じてバッチを累積する
         .build(
             TuningForkPINN::<B>::new(&device),
             config.optimizer.init(),
